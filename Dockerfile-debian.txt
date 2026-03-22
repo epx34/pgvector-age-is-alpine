@@ -1,0 +1,48 @@
+FROM postgres:17-bookworm
+
+ARG PGVECTOR_VERSION=v0.8.2
+# ARG AGE_TAG=PG17/v1.7.0
+ARG AGE_TAG=PG17/v1.7.0-rc0
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    gnupg \
+    ca-certificates \
+    lsb-release \
+    build-essential \
+    git \
+    clang \
+    llvm \
+    flex \
+    bison \
+    libc6-dev \
+    libreadline-dev \
+    zlib1g-dev \
+    make \
+ && echo "deb http://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+ && wget -qO - https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends \
+    postgresql-server-dev-17 \
+    postgresql-17-postgis-3 \
+    postgresql-17-postgis-3-scripts \
+ && rm -rf /var/lib/apt/lists/*
+
+# pgvector
+RUN git clone --branch ${PGVECTOR_VERSION} https://github.com/pgvector/pgvector.git /tmp/pgvector \
+ && make -C /tmp/pgvector PG_CONFIG=/usr/lib/postgresql/17/bin/pg_config \
+ && make -C /tmp/pgvector install PG_CONFIG=/usr/lib/postgresql/17/bin/pg_config \
+ && rm -rf /tmp/pgvector
+
+# Apache AGE
+ RUN git clone --branch "${AGE_TAG}" https://github.com/apache/age.git /tmp/age \
+ && make -C /tmp/age PG_CONFIG=/usr/lib/postgresql/17/bin/pg_config \
+ && make -C /tmp/age install PG_CONFIG=/usr/lib/postgresql/17/bin/pg_config \
+ && rm -rf /tmp/age
+
+# AGE precisa estar preloadado
+RUN echo "shared_preload_libraries = 'age'" >> /usr/share/postgresql/postgresql.conf.sample
+
+COPY init-extensions.sql /docker-entrypoint-initdb.d/01-init-extensions.sql

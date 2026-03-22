@@ -18,26 +18,24 @@ RUN apk add --no-cache \
     zlib-dev \
     linux-headers \
     coreutils \
-    tar
+    tar \
+    postgresql17-dev
 
 # pgvector
 RUN git clone --depth 1 --branch ${PGVECTOR_VERSION} https://github.com/pgvector/pgvector.git /tmp/pgvector \
- && /usr/local/bin/pg_config --version \
- && /usr/local/bin/pg_config --pkglibdir \
- && make -C /tmp/pgvector PG_CONFIG=/usr/local/bin/pg_config \
- && make -C /tmp/pgvector install PG_CONFIG=/usr/local/bin/pg_config \
+ && make -C /tmp/pgvector PG_CONFIG=/usr/bin/pg_config \
+ && make -C /tmp/pgvector install PG_CONFIG=/usr/bin/pg_config \
  && rm -rf /tmp/pgvector
 
-# Apache AGE
+# Apache AGE via tarball da tag release
 RUN mkdir -p /tmp/age-src \
  && curl -fL "https://github.com/apache/age/archive/refs/tags/${AGE_TAG}.tar.gz" -o /tmp/age.tar.gz \
  && tar -xzf /tmp/age.tar.gz -C /tmp/age-src --strip-components=1 \
- && /usr/local/bin/pg_config --version \
- && /usr/local/bin/pg_config --pkglibdir \
- && make -C /tmp/age-src PG_CONFIG=/usr/local/bin/pg_config \
- && make -C /tmp/age-src install PG_CONFIG=/usr/local/bin/pg_config \
+ && make -C /tmp/age-src PG_CONFIG=/usr/bin/pg_config \
+ && make -C /tmp/age-src install PG_CONFIG=/usr/bin/pg_config \
  && rm -rf /tmp/age-src /tmp/age.tar.gz
 
+# preload do AGE
 RUN echo "shared_preload_libraries = 'age'" >> /usr/local/share/postgresql/postgresql.conf.sample
 
 COPY init-extensions.sql /docker-entrypoint-initdb.d/01-init-extensions.sql
